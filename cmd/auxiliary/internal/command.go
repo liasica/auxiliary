@@ -23,7 +23,7 @@ func RunCommand() {
 		},
 	}
 
-	cmd.PersistentFlags().StringVarP(&configFile, "config", "c", "/opt/auxiliary/config/config.yaml", "配置文件")
+	cmd.PersistentFlags().StringVarP(&configFile, "config", "c", "/etc/auxiliary/config.yaml", "配置文件")
 
 	cmd.AddCommand(
 		newMessage(),
