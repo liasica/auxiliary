@@ -32,11 +32,14 @@ func newMessage() *cobra.Command {
 
 func (m *message) addSendCommand() {
 	type ApkMessage struct {
-		ID       string `json:"CI_JOB_ID"`
-		Intranet string `json:"INTRANET_DOWNLOAD"`
-		Extranet string `json:"EXTRANET_DOWNLOAD"`
-		Name     string `json:"APP_NAME"`
-		Message  string `json:"CI_COMMIT_MESSAGE"`
+		ID         string `json:"CI_JOB_ID,omitempty"`
+		AppName    string `json:"APP_NAME,omitempty"`
+		Message    string `json:"CI_COMMIT_MESSAGE,omitempty"`
+		RCIntranet string `json:"RC_INTRANET_DOWNLOAD,omitempty"`
+		RCExtranet string `json:"RC_EXTRANET_DOWNLOAD,omitempty"`
+		RDIntranet string `json:"RD_INTRANET_DOWNLOAD,omitempty"`
+		RDExtranet string `json:"RD_EXTRANET_DOWNLOAD,omitempty"`
+		Version    string `json:"VERSION,omitempty"`
 	}
 
 	var (
@@ -65,10 +68,13 @@ func (m *message) addSendCommand() {
 	cmd.Flags().StringVar(&templateId, "template", "", "模板ID")
 	cmd.Flags().StringVar(&receiveId, "id", "", "接收消息方")
 	cmd.Flags().StringVar(&msg.ID, "job", "", "JOB ID")
-	cmd.Flags().StringVar(&msg.Intranet, "intranet", "", "内网下载链接")
-	cmd.Flags().StringVar(&msg.Extranet, "extranet", "", "外网下载链接")
-	cmd.Flags().StringVar(&msg.Name, "name", "", "App名称")
+	cmd.Flags().StringVar(&msg.RCIntranet, "rc-intranet", "", "RC 内网下载链接")
+	cmd.Flags().StringVar(&msg.RCExtranet, "rc-extranet", "", "RC 外网下载链接")
+	cmd.Flags().StringVar(&msg.RDIntranet, "rd-intranet", "", "RD 内网下载链接")
+	cmd.Flags().StringVar(&msg.RDExtranet, "rd-extranet", "", "RD 外网下载链接")
+	cmd.Flags().StringVar(&msg.AppName, "name", "", "App名称")
 	cmd.Flags().StringVar(&msg.Message, "message", "", "更新消息")
+	cmd.Flags().StringVar(&msg.Version, "version", "", "版本号")
 
 	m.AddCommand(cmd)
 }
