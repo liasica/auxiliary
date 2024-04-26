@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/go-resty/resty/v2 v2.12.0
+	github.com/google/gopacket v1.1.19
 	github.com/google/uuid v1.4.0
 	github.com/json-iterator/go v1.1.12
 	github.com/redis/go-redis/v9 v9.5.1
