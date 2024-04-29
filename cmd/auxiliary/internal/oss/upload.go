@@ -12,22 +12,22 @@ import (
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/gosuri/uiprogress"
-	"github.com/gosuri/uiprogress/util/strutil"
 	"github.com/spf13/cobra"
 )
 
 // ProgressListener 定义进度条监听器
 type ProgressListener struct {
-	bar   *uiprogress.Bar
+	// bar   *uiprogress.Bar
 	speed float64
+	start time.Time
 }
 
 func NewProgressListener() *ProgressListener {
 	uiprogress.Start()
 	listener := &ProgressListener{}
-	listener.bar = uiprogress.AddBar(100).AppendCompleted().PrependFunc(func(b *uiprogress.Bar) string {
-		return strutil.PadLeft(fmt.Sprintf("%.2f Kb/s (%s)", listener.speed, strutil.PrettyTime(time.Since(b.TimeStarted))), 25, ' ')
-	})
+	// listener.bar = uiprogress.AddBar(100).AppendCompleted().PrependFunc(func(b *uiprogress.Bar) string {
+	// 	return strutil.PadLeft(fmt.Sprintf("%.2f Kb/s (%s)", listener.speed, strutil.PrettyTime(time.Since(b.TimeStarted))), 25, ' ')
+	// })
 	return listener
 }
 
@@ -35,21 +35,21 @@ func NewProgressListener() *ProgressListener {
 func (listener *ProgressListener) ProgressChanged(event *oss.ProgressEvent) {
 	switch event.EventType {
 	case oss.TransferStartedEvent:
-		// fmt.Printf("Transfer Started, ConsumedBytes: %d, TotalBytes %d.\n", event.ConsumedBytes, event.TotalBytes)
-		listener.bar.TimeStarted = time.Now()
-		_ = listener.bar.Set(0)
+		// listener.bar.TimeStarted = time.Now()
+		// _ = listener.bar.Set(0)
+		listener.start = time.Now()
 	case oss.TransferDataEvent:
-		// fmt.Printf("\rTransfer Data, ConsumedBytes: %d, TotalBytes %d, %d%%.", event.ConsumedBytes, event.TotalBytes, event.ConsumedBytes*100/event.TotalBytes)
-		kb := float64(event.ConsumedBytes) / 1024.0
-		past := time.Since(listener.bar.TimeStarted).Seconds()
-		listener.speed = kb / past
-
-		_ = listener.bar.Set(int(event.ConsumedBytes * 100 / event.TotalBytes))
+		// kb := float64(event.ConsumedBytes) / 1024.0
+		// past := time.Since(listener.bar.TimeStarted).Seconds()
+		// listener.speed = kb / past
+		// _ = listener.bar.Set(int(event.ConsumedBytes * 100 / event.TotalBytes))
 	case oss.TransferCompletedEvent:
-		// fmt.Printf("\nTransfer Completed, ConsumedBytes: %d, TotalBytes %d.\n", event.ConsumedBytes, event.TotalBytes)
-		_ = listener.bar.Set(100)
+		kb := float64(event.ConsumedBytes) / 1024.0
+		past := time.Since(listener.start).Seconds()
+		fmt.Printf("\n上传完成, 文件大小: %d Bytes, 速度: %.2f Kb/s\n", event.TotalBytes, kb/past)
+		// _ = listener.bar.Set(100)
 	case oss.TransferFailedEvent:
-		fmt.Printf("\nTransfer Failed, ConsumedBytes: %d, TotalBytes %d.\n", event.ConsumedBytes, event.TotalBytes)
+		fmt.Printf("\n上传失败, 已上传: %d Bytes, 文件大小: %d.\n", event.ConsumedBytes, event.TotalBytes)
 		os.Exit(1)
 	default:
 	}
@@ -69,15 +69,6 @@ func uploader() *cobra.Command {
 		Args:              cobra.ExactArgs(2),
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 		Run: func(_ *cobra.Command, args []string) {
-			// uiprogress.Start()
-			// bar := uiprogress.AddBar(100).AppendCompleted().PrependFunc(func(b *uiprogress.Bar) string {
-			// 	return strutil.PadLeft(b.TimeElapsedString(), 5, ' ')
-			// })
-			// for bar.Incr() {
-			// 	time.Sleep(time.Millisecond * 20)
-			// }
-			// os.Exit(0)
-
 			file := args[0]
 			if _, err := os.Stat(file); err != nil {
 				fmt.Printf("文件不存在: %s\n", file)
