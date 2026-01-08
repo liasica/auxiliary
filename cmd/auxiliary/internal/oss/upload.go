@@ -6,6 +6,7 @@ package oss
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"time"
@@ -69,9 +70,9 @@ func uploader() *cobra.Command {
 		Args:              cobra.ExactArgs(2),
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 		Run: func(_ *cobra.Command, args []string) {
-			file := args[0]
-			if _, err := os.Stat(file); err != nil {
-				fmt.Printf("文件不存在: %s\n", file)
+			fp := args[0]
+			if _, err := os.Stat(fp); err != nil {
+				fmt.Printf("文件不存在: %s\n", fp)
 				os.Exit(1)
 			}
 
@@ -99,11 +100,55 @@ func uploader() *cobra.Command {
 				os.Exit(1)
 			}
 
-			// 带进度条的上传。
-			err = bucket.PutObjectFromFile(object, file, oss.Progress(NewProgressListener()))
+			// 获取文件大小
+			fileInfo, err := os.Stat(fp)
 			if err != nil {
-				fmt.Printf("上传文件失败: %s\n", err)
+				fmt.Printf("获取文件信息失败: %s\n", err)
 				os.Exit(1)
+			}
+			fileSize := fileInfo.Size()
+
+			// 如果文件大于100MB，使用分片上传
+			const chunkSize = 100 * 1024 * 1024 // 100MB
+			if fileSize > chunkSize {
+				fmt.Printf("文件大小: %.2f MB, 使用分片上传\n", float64(fileSize)/1024/1024)
+
+				var chunks []oss.FileChunk
+				chunks, err = oss.SplitFileByPartSize(fp, chunkSize)
+				if err != nil {
+					fmt.Printf("分片文件失败: %s\n", err)
+					os.Exit(1)
+				}
+
+				// 初始化分片上传
+				var imur oss.InitiateMultipartUploadResult
+				imur, err = bucket.InitiateMultipartUpload(object)
+				if err != nil {
+					fmt.Printf("初始化分片上传失败: %s\n", err)
+					os.Exit(1)
+				}
+
+				// 上传分片
+				var parts []oss.UploadPart
+				for _, chunk := range chunks {
+					part := uploadChunk(bucket, imur, chunk, fp)
+					parts = append(parts, part)
+				}
+
+				// 完成分片上传
+				_, err = bucket.CompleteMultipartUpload(imur, parts)
+				if err != nil {
+					fmt.Printf("完成分片上传失败: %s\n", err)
+					os.Exit(1)
+				}
+			} else {
+				// 小文件直接上传
+				fmt.Printf("文件大小: %.2f MB, 使用普通上传\n", float64(fileSize)/1024/1024)
+				err = bucket.PutObjectFromFile(object, fp, oss.Progress(NewProgressListener()))
+				if err != nil {
+					fmt.Printf("上传文件失败: %s\n", err)
+					os.Exit(1)
+				}
 			}
 		},
 	}
@@ -116,4 +161,30 @@ func uploader() *cobra.Command {
 	_ = cmd.MarkFlagRequired("accessKeySecret")
 
 	return cmd
+}
+
+func uploadChunk(bucket *oss.Bucket, imur oss.InitiateMultipartUploadResult, chunk oss.FileChunk, fp string) (part oss.UploadPart) {
+	fd, err := os.Open(fp)
+	if err != nil {
+		fmt.Printf("打开文件失败: %s\n", err)
+		os.Exit(1)
+	}
+	defer func(fd *os.File) {
+		_ = fd.Close()
+	}(fd)
+
+	_, err = fd.Seek(chunk.Offset, io.SeekStart)
+	if err != nil {
+		fmt.Printf("定位文件指针失败: %s\n", err)
+		os.Exit(1)
+	}
+
+	part, err = bucket.UploadPart(imur, fd, chunk.Size, chunk.Number, oss.Progress(NewProgressListener()))
+	if err != nil {
+		fmt.Printf("上传分片 %d 失败: %s\n", chunk.Number, err)
+		_ = bucket.AbortMultipartUpload(imur)
+		os.Exit(1)
+	}
+
+	return
 }
